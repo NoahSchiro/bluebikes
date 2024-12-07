@@ -1,13 +1,19 @@
 import sqlite3
 
-connection = sqlite3.connect("../data/data.db")
+loc = input("Db location: ")
+
+connection = sqlite3.connect(loc)
 cursor = connection.cursor()
 
 while True:
 
     user_input = input("> ")
 
-    res = cursor.execute(user_input).fetchall()
+    try:
+        res = cursor.execute(user_input).fetchall()
+        for r in res:
+            print(r)
+    except Exception as e:
+        print(e)
 
-    for r in res:
-        print(res)
+

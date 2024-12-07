@@ -6,13 +6,39 @@ import sqlite3
 def handle_normal(df):
     # Drop columns we don't care about
     df.drop(["gender", "birth year", "bikeid"], axis=1, inplace=True)
-    print("Dropped columns...")
+    # Columns we need to rename
+    df.rename({
+        "start station name" : "start_station_name",
+        "start station id" : "start_station_id",
+        "start station latitude" : "start_lat",
+        "start station longitude" : "start_lng",
+        
+        "end station name" : "end_station_name",
+        "end station id" : "end_station_id",
+        "end station latitude" : "end_lat",
+        "end station longitude" : "end_lng",
+    }, axis=1, inplace=True)
 
+    print("Dropped columns...")
     return df
 
 # Handles dataframes that end with a postal code
 def handle_postal(df):
     df.drop(["postal code", "bikeid"], axis=1, inplace=True)
+    
+    # Columns we need to rename
+    df.rename({
+        "start station name" : "start_station_name",
+        "start station id" : "start_station_id",
+        "start station latitude" : "start_lat",
+        "start station longitude" : "start_lng",
+        
+        "end station name" : "end_station_name",
+        "end station id" : "end_station_id",
+        "end station latitude" : "end_lat",
+        "end station longitude" : "end_lng",
+    }, axis=1, inplace=True)
+
     print("Dropped columns...")
     return df
 
@@ -26,17 +52,6 @@ def handle_weird(df):
     df.rename({
         "started_at" : "starttime",
         "ended_at" : "stoptime",
-        
-        "start_station_name" : "start station name",
-        "start_station_id" : "start station id",
-        "start_lat" : "start station latitude",
-        "start_lng" : "start station longitude",
-        
-        "end_station_name" : "end station name",
-        "end_station_id" : "end station id",
-        "end_lat" : "end station latitude",
-        "end_lng" : "end station longitude",
- 
         "member_casual" : "usertype",
     }, axis=1, inplace=True)
     print("Renamed...")
@@ -83,36 +98,68 @@ def handle_df(df):
         print("Did not expect a DF with header: ")
         print(df.columns.to_list())
 
-def collect_csv(filepath="../data/"):
-
-    dfs = []
+def main(conn, columns, filepath):
 
     for root, _, files in os.walk(filepath):
         for file in files:
             if file.endswith(".csv"):
                 print(f"Loading {file}...")
+                # Collect
                 path = os.path.join(root, file)
-                dfs.append(pandas.read_csv(path))
+                data_frame = pandas.read_csv(path)
+                # Transform
+                data_frame = handle_df(data_frame)
+                # Write
+                register(conn, columns, data_frame)
+                # Free up memory
+                del data_frame
 
-    return dfs
-
-def register(conn, list_of_df):
+def register(conn, columns, df):
     # Ensure column order is consistent
-    columns = list_of_df[0].columns  # Assume the first DataFrame's column order as the standard
-    aligned_dataframes = [df[columns] for df in list_of_df]
+    aligned_dataframe = df[columns]
 
     print("Writing dfs to db...", end="")
     # Iterate over DataFrames and append to the SQLite table
-    for df in aligned_dataframes:
+    
+    # Append to the SQLite table
+    aligned_dataframe.to_sql("blue_bikes", conn, if_exists="append", index=False)
 
-        # Append to the SQLite table
-        df.to_sql("blue bikes", conn, if_exists="append", index=False)
     print(" complete!")
 
 if __name__=="__main__":
+    filepath = input("Data location: ")
 
-    conn = sqlite3.connect("data.db")
+    conn = sqlite3.connect(os.path.join(filepath, "data.db"))
+    columns = [
+        "tripduration",
+        "starttime",
+        "stoptime",
+        "start_station_id",
+        "start_station_name",
+        "start_lat",
+        "start_lng",
+        "end_station_id",
+        "end_station_name",
+        "end_lat",
+        "end_lng",
+        "usertype",
+    ]
 
-    data = collect_csv()
-    new_data = [handle_df(df) for df in data]
-    register(conn, new_data)
+    # Create a table with an auto-incrementing primary key
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS blue_bikes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tripduration INT,
+        starttime DATETIME,
+        stoptime DATETIME,
+        start_station_id INT,
+        start_station_name TEXT,
+        start_lat FLOAT,
+        start_lng FLOAT,
+        end_station_id INT,
+        end_station_name TEXT,
+        end_lat FLOAT,
+        end_lng FLOAT,
+        usertype TEXT
+    )""")
+    main(conn, columns, filepath)
