@@ -5,7 +5,7 @@ import sqlite3
 # Handles the "normal" case
 def handle_normal(df):
     # Drop columns we don't care about
-    df.drop(["gender", "birth year", "bikeid"], axis=1, inplace=True)
+    df.drop(["bikeid"], axis=1, inplace=True)
     # Columns we need to rename
     df.rename({
         "start station name" : "start_station_name",
@@ -17,6 +17,8 @@ def handle_normal(df):
         "end station id" : "end_station_id",
         "end station latitude" : "end_lat",
         "end station longitude" : "end_lng",
+
+        "birth year" : "birth_year"
     }, axis=1, inplace=True)
 
     print("Dropped columns...")
@@ -38,6 +40,9 @@ def handle_postal(df):
         "end station latitude" : "end_lat",
         "end station longitude" : "end_lng",
     }, axis=1, inplace=True)
+
+    df["birth_year"] = None
+    df["gender"] = None
 
     print("Dropped columns...")
     return df
@@ -70,6 +75,10 @@ def handle_weird(df):
     df["usertype"].apply(mapping)
 
     print("Remapped usertype")
+    
+    # Add columns where data is missing
+    df["birth_year"] = None
+    df["gender"] = None
 
     # Convert columns to datetime
     df["starttime"] = pandas.to_datetime(df["starttime"])
@@ -143,6 +152,8 @@ if __name__=="__main__":
         "end_lat",
         "end_lng",
         "usertype",
+        "birth_year",
+        "gender"
     ]
 
     # Create a table with an auto-incrementing primary key
@@ -160,6 +171,8 @@ if __name__=="__main__":
         end_station_name TEXT,
         end_lat FLOAT,
         end_lng FLOAT,
-        usertype TEXT
+        usertype TEXT,
+        birth_year INT,
+        gender INT
     )""")
     main(conn, columns, filepath)
