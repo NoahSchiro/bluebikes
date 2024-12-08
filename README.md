@@ -30,4 +30,4 @@ We will try to build a Dynamic Pricing Model to increase revenue and bike availa
 
 # Data Analysis
 
-What interesting trends exist in the data?
+We have a special [doc](./data_analysis/README.md) for our analysis of the data!
