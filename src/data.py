@@ -37,7 +37,10 @@ class BikeData():
             print(f"Couldn't find a csv at {self.csv_path}, and no valid sql path was provided... failing")
             exit(0)
 
+        # Make sure everything is a datetime object
         self.data["hour"] = pd.to_datetime(self.data["hour"], format="%Y-%m-%d %H:%M:%S", errors="coerce")
+
+        # Remove N/A columns and replace with 0s
         self.data = self.data.dropna()
 
         # Extract all station names, create embeddings
@@ -47,6 +50,21 @@ class BikeData():
 
         # Extract all hours
         self.unique_hours = list(self.grouped_data["hour"].unique())
+
+        # Now we need to fill in values which might have no entries.
+        # If a particular station at a particular time has no arrivals
+        # or entries, then it won't appear in this list. We want it
+        # to appear, and just have a 0
+        full_range = pd.date_range(start=self.data["hour"].min(), end=self.data["hour"].max(), freq="H")
+
+        # Create a MultiIndex with all (station, timestamp) combinations
+        multi_index = pd.MultiIndex.from_product(
+            [full_range, self.station_names],
+            names=["hour", "station"]
+        )
+
+        # Reindex DataFrame to ensure all combinations exist
+        self.data = self.data.set_index(["hour", "station"]).reindex(multi_index, fill_value=0).reset_index()
 
     def _load_csv(self, path):
         self.data = pd.read_csv(
@@ -67,45 +85,6 @@ class BikeData():
 
         print(f"Querying db at {sql_path}...")
 
-        """
-        OG:
-            SELECT 
-                strftime('%Y-%m-%d %H:00:00', starttime) AS hour,
-                start_station_name AS station,
-                COUNT(*) AS departures,
-                0 AS arrivals
-            FROM blue_bikes 
-            WHERE {where_query}
-            GROUP BY hour, station
-
-            UNION ALL
-
-            SELECT 
-                strftime('%Y-%m-%d %H:00:00', stoptime) AS hour,
-                end_station_name AS station,
-                0 AS departures,
-                COUNT(*) AS arrivals
-            FROM blue_bikes
-            WHERE {where_query}
-            GROUP BY hour, station;
-
-        Alternate:
-            SELECT
-                strftime('%Y-%m-%d %H:00:00', starttime) AS hour,
-                start_station_name AS station,
-                COUNT(*) AS departures,
-                SUM(COALESCE(end_station_name = start_station_name, 0)) AS arrivals
-            FROM
-                blue_bikes
-            WHERE {where_query}
-            GROUP BY
-                hour,
-                station
-            ORDER BY
-                hour, station;
-
-
-        """
         df = pd.read_sql_query(f"""
             WITH Departures AS (
                 SELECT
@@ -182,7 +161,6 @@ class BikeData():
 
             # It's supposed to be sorted already but one last check
             station_data = station_data.sort_values(by="hour")
-            #df.drop_duplicates(subset=['A', 'B'], inplace=True)
 
             print(station)
             print(station_data)
@@ -206,15 +184,18 @@ class BikeData():
 
 
 if __name__=="__main__":
+
+    # Pathing assumes you are running this from bluebikes/src
     pd.set_option('display.max_columns', 7)
 
     data = BikeData(
         csv_path="../data/data_test.csv",
         sql_path="../data/data.db",
         train=False,
+        batch_size=1
     )
 
-    ex = data[800]
+    ex = data[2000]
 
     print("Station embeddings shape: {}".format(ex["station_embeddings"].shape))
     print(ex["hour"])
