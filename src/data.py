@@ -71,7 +71,7 @@ class BikeData():
             path,
             dtype=self.dtype,
         )
-        self.grouped_data = self.data.groupby(self.data["hour"])
+        self.grouped_data = self.data.groupby("hour")
     
     def _create_csv_from_sql(self, csv_path, sql_path, train):
         db = sqlite3.connect(sql_path)
@@ -93,6 +93,7 @@ class BikeData():
                     COUNT(*) AS departures
                 FROM
                     blue_bikes
+                WHERE {where_query}
                 GROUP BY
                     hour, station
             ),
@@ -103,6 +104,7 @@ class BikeData():
                     COUNT(*) AS arrivals
                 FROM
                     blue_bikes
+                WHERE {where_query}
                 GROUP BY
                     hour, station
             )
@@ -147,7 +149,7 @@ class BikeData():
 
         time_mask = (self.data["hour"] >= start_idx) & (self.data["hour"] <= end_idx)
         hour_group = self.data[time_mask]
-
+        
         # Randomly select stations
         station_names = list(hour_group["station"].unique())
         sampled_stations = np.random.choice(station_names, size=self.batch_size, replace=False)
@@ -155,32 +157,46 @@ class BikeData():
         # Filter to only stations in sampled stations
         filtered = hour_group[hour_group["station"].isin(sampled_stations)]
 
-        # Build the tensor for each station
-        for station in sampled_stations:
-            station_data = filtered[filtered["station"] == station]
+        all_station_data = [
+            filtered[filtered["station"] == station]
+            for station in sampled_stations
+        ]
 
-            # It's supposed to be sorted already but one last check
-            station_data = station_data.sort_values(by="hour")
+        times = pd.to_datetime(hour_group["hour"].unique())
+        years = list(times.year)
+        months = list(times.month)
+        days = list(times.day)
+        hour = list(times.hour)
 
-            print(station)
-            print(station_data)
+        time_info = list(zip(years, months, days, hour))
 
-        exit(0)
+        # Converts times into a tensor, and copys the data across many batches
+        # [batch_size, sequence_length, time_information]
+        times_as_tensor = torch.tensor(time_info).unsqueeze(0).expand(self.batch_size, -1, -1)
 
+        # Get station information in embedding form
+        # torch.shape[batch_size, sequence_length, embedding_dim=10]
+        stations = torch.stack([
+            torch.stack([self.station_embeddings[x] for x in s["station"].to_list()])
+            for s in all_station_data
+        ])
 
-        random_sample = hour_group.sample(n=self.batch_size)
-        stations = list(random_sample["station"])
-        arrivals = list(random_sample["arrivals"])
-        departures = list(random_sample["departures"])
+        # torch.shape[batch_size, sequence_length, arrivals = 1]
+        arrivals = torch.stack(
+            [torch.tensor(s["arrivals"].to_list()) for s in all_station_data]
+        ).unsqueeze(-1)
 
-        data = {
-            "station_embeddings" : torch.stack([self.station_embeddings[name] for name in stations], dim=0),
-            "hour" : list(random_sample["hour"]),
-            "arrivals" : torch.tensor(arrivals, dtype=torch.float).view(self.batch_size, 1),
-            "departures" : torch.tensor(departures, dtype=torch.float).view(self.batch_size, 1),
-        }
+        # torch.shape[batch_size, sequence_length, depatures=1]
+        departures = torch.stack(
+            [torch.tensor(s["departures"].to_list()) for s in all_station_data]
+        ).unsqueeze(-1)
+        
+        # Final shape
+        # batch, time_seq_input, station_embedding, time information, arrivals, departures
+        # batch, time_seq_output, station_embedding, time information, arrivals, departures
+        all_as_tensor = torch.cat((stations, times_as_tensor, arrivals, departures), dim=2)
+        return all_as_tensor
 
-        return data
 
 
 if __name__=="__main__":
@@ -194,11 +210,8 @@ if __name__=="__main__":
         train=False,
         batch_size=1
     )
-
-    ex = data[2000]
-
-    print("Station embeddings shape: {}".format(ex["station_embeddings"].shape))
-    print(ex["hour"])
-    print(ex["arrivals"])
-    print(ex["departures"])
+    import datetime
+    start = datetime.datetime.now()
+    print(data[2000][0])
+    print(data[2001][0])
 
