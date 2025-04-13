@@ -17,8 +17,6 @@ class BlueBikesModel(nn.Module):
     # performs preprocessing conducive to ML
     def preprocess(self, data, stats):
 
-        print(data.shape)
-        
         # For month, day, and hour, we will use a cyclical encoding
         def cyclical(data, max):
             return torch.sin((2 * torch.pi * ((data-1) / max)))
@@ -37,16 +35,18 @@ class BlueBikesModel(nn.Module):
         data[:, :, 0] = (data[:, :, 0] - year_min) / year_range
 
         # Normalize arrivals and departures based on min and max (linear transformation to [0,1])
-        arr_min = stats["arrivals"]["min"]
-        arr_max = stats["arrivals"]["max"]
-        arr_range = arr_max - arr_min
-        data[:, :, 4] = (data[:, :, 4] - arr_min) / arr_range
+        # TODO: because the last layer of our model is just a linerar layer, we may not need this
+        # arr_min = stats["arrivals"]["min"]
+        # arr_max = stats["arrivals"]["max"]
+        # arr_range = arr_max - arr_min
+        # data[:, :, 4] = (data[:, :, 4] - arr_min) / arr_range
+        #
+        # dep_min = stats["departures"]["min"]
+        # dep_max = stats["departures"]["max"]
+        # dep_range = dep_max - dep_min
+        # data[:, :, 5] = (data[:, :, 5] - dep_min) / dep_range
 
-        dep_min = stats["departures"]["min"]
-        dep_max = stats["departures"]["max"]
-        dep_range = dep_max - dep_min
-        data[:, :, 5] = (data[:, :, 5] - dep_min) / dep_range
-        print(data)
+        return data
 
     def forward(self, x):
         _, (hidden, _) = self.lstm(x)
@@ -55,7 +55,7 @@ class BlueBikesModel(nn.Module):
 if __name__=="__main__":
 
     model = BlueBikesModel(
-        input_size=6,
+        input_size=7,
         hidden_size=32,
         num_layers=2
     )

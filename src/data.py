@@ -28,10 +28,12 @@ class StationData(Dataset):
             exit(0)
         else:
             self.station_name = station_name
+            station_name = station_name.replace(" ", "").lower()
+            self.station_name_fp = station_name
 
         self.db_path = sql_path
         # This is not a good way of doing this... TODO
-        self.csv_path = "/".join(sql_path.split("/")[:-1]) + "/" + self.station_name + ("_train.csv" if train else "_test.csv")
+        self.csv_path = "/".join(sql_path.split("/")[:-1]) + "/" + self.station_name_fp + ("_train.csv" if train else "_test.csv")
 
         self.time_window_hours = time_window_hours
         self.pred_horizon = pred_horizon
@@ -105,54 +107,28 @@ class StationData(Dataset):
         """, db, dtype=self.dtype)
 
         df = df.drop(["station"], axis=1)
-        self.data         = df.sort_values(["hour"])
-        self.grouped_data = self.data.groupby("hour")
+        data         = df.sort_values(["hour"])
+        grouped_data = data.groupby("hour")
 
         # Make sure everything is a datetime object
-        self.data["hour"] = pd.to_datetime(self.data["hour"], format="%Y-%m-%d %H:%M:%S", errors="coerce")
+        data["hour"] = pd.to_datetime(data["hour"], format="%Y-%m-%d %H:%M:%S", errors="coerce")
 
         # Remove N/A columns and replace with 0s
-        self.data = self.data.dropna()
-        self.data.set_index('hour', inplace=True)
-        self.data = self.data.resample('H').asfreq().fillna(0)
-        self.data.reset_index(inplace=True)
+        data = data.dropna()
+        data.set_index('hour', inplace=True)
+        data = data.resample('H').asfreq().fillna(0)
+        data.reset_index(inplace=True)
 
         # Extract datetime features
-        self.data['year'] = self.data['hour'].dt.year
-        self.data['month'] = self.data['hour'].dt.month
-        self.data['day'] = self.data['hour'].dt.day
-        self.data['hour_int'] = self.data['hour'].dt.hour
+        data['year'] = data['hour'].dt.year
+        data['month'] = data['hour'].dt.month
+        data['day'] = data['hour'].dt.day
+        data['weekday'] = data['hour'].dt.dayofweek
+        data['hour_int'] = data['hour'].dt.hour
 
         print(f"Done. Saving to {csv_path}...")
-        self.data.to_csv(csv_path, index=False)
-        print("Done.")
-
-    # Get stats on the dataset for normalization.
-    # You have the option to set max year if you want to future proof your model
-    def stats(self, min_year=None, max_year=None):
-        min_year = int(self.data["year"].min()) if not min_year else min_year
-        max_year = int(self.data["year"].max()) if not max_year else max_year
-
-        min_arrivals = self.data["arrivals"].min()
-        max_arrivals = self.data["arrivals"].max()
-        
-        min_departures = self.data["departures"].min()
-        max_departures = self.data["departures"].max()
-
-        return {
-            "year": {
-                "min" : min_year,
-                "max" : max_year,
-            },
-            "arrivals" : {
-                "min" : min_arrivals,
-                "max" : max_arrivals,
-            },
-            "departures" : {
-                "min" : min_departures,
-                "max" : max_departures,
-            },
-        }
+        data.to_csv(csv_path, index=False)
+        self._load_csv(csv_path)
 
     def __len__(self):
         return len(self.unique_hours) - self.time_window_hours - self.pred_horizon
@@ -168,19 +144,17 @@ class StationData(Dataset):
         
         # Convert to tensors
         tensor_x = torch.tensor(
-            x[['year', 'month', 'day', 'hour_int', 'departures', 'arrivals']].values,
+            x[['year', 'month', 'day', 'weekday', 'hour_int', 'departures', 'arrivals']].values,
             dtype=torch.float32
         )
         tensor_y = torch.tensor(
-            y[['year', 'month', 'day', 'hour_int', 'departures', 'arrivals']].values,
+            y[['year', 'month', 'day', 'weekday', 'hour_int', 'departures', 'arrivals']].values,
             dtype=torch.float32
         )
 
         # Will have shape [time_window, features]
         # and [time_window_features]
         return tensor_x, tensor_y 
-
-
 
 if __name__=="__main__":
 
@@ -190,7 +164,3 @@ if __name__=="__main__":
         sql_path="../data/data.db",
         train=False
     )
-    x, y = data[200]
-
-    print(x)
-    print(y)
