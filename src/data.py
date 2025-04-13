@@ -2,12 +2,12 @@ import os
 import sqlite3
 
 import pandas as pd
-import numpy as np
 import torch
+from torch.utils.data import Dataset
 
-from stations import station_names
+from .stations import station_names
 
-class StationData():
+class StationData(Dataset):
     def __init__(
         self,
         station_name,
@@ -126,6 +126,33 @@ class StationData():
         print(f"Done. Saving to {csv_path}...")
         self.data.to_csv(csv_path, index=False)
         print("Done.")
+
+    # Get stats on the dataset for normalization.
+    # You have the option to set max year if you want to future proof your model
+    def stats(self, min_year=None, max_year=None):
+        min_year = int(self.data["year"].min()) if not min_year else min_year
+        max_year = int(self.data["year"].max()) if not max_year else max_year
+
+        min_arrivals = self.data["arrivals"].min()
+        max_arrivals = self.data["arrivals"].max()
+        
+        min_departures = self.data["departures"].min()
+        max_departures = self.data["departures"].max()
+
+        return {
+            "year": {
+                "min" : min_year,
+                "max" : max_year,
+            },
+            "arrivals" : {
+                "min" : min_arrivals,
+                "max" : max_arrivals,
+            },
+            "departures" : {
+                "min" : min_departures,
+                "max" : max_departures,
+            },
+        }
 
     def __len__(self):
         return len(self.unique_hours) - self.time_window_hours - self.pred_horizon

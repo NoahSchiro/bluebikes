@@ -1,2 +1,5 @@
 # Data folder
 /data/
+
+# Python junk
+__pycache__/
