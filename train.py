@@ -1,5 +1,6 @@
 import argparse
 import os
+from datetime import datetime
 
 import torch
 from torch import nn
@@ -94,12 +95,14 @@ def main(args):
     train_ds = StationData(
         station_name=args.station,
         sql_path="./data/data.db",
-        train=True
+        train=True,
+        time_window_hours=args.time_window,
     )
     test_ds = StationData(
         station_name=args.station,
         sql_path="./data/data.db",
-        train=False
+        train=False,
+        time_window_hours=args.time_window,
     )
 
     year_norm = {
@@ -127,7 +130,8 @@ def main(args):
 
     # Convert the station name to something appropriate for linux file paths
     station_name = args.station.replace(" ", "").lower()
-    save_path = f"./models/{station_name}.pth"
+    time = datetime.now().strftime("%Y-%m-%d:%H-%M")
+    save_path = f"./models/{station_name}{time}.pth"
 
     with mlflow.start_run():
         mlflow.log_params(vars(args))
@@ -191,6 +195,12 @@ if __name__=="__main__":
         "--station",
         choices=list(station_names),
         help="Which station to train on"
+    )
+    parser.add_argument(
+        "--time_window",
+        type=int,
+        default=24,
+        help="The amount of context the model gets before predicting the next hour"
     )
 
     # Model hyperparameters
