@@ -34,18 +34,6 @@ class BlueBikesModel(nn.Module):
         year_range = year_max - year_min
         data[:, :, 0] = (data[:, :, 0] - year_min) / year_range
 
-        # Normalize arrivals and departures based on min and max (linear transformation to [0,1])
-        # TODO: because the last layer of our model is just a linerar layer, we may not need this
-        # arr_min = stats["arrivals"]["min"]
-        # arr_max = stats["arrivals"]["max"]
-        # arr_range = arr_max - arr_min
-        # data[:, :, 4] = (data[:, :, 4] - arr_min) / arr_range
-        #
-        # dep_min = stats["departures"]["min"]
-        # dep_max = stats["departures"]["max"]
-        # dep_range = dep_max - dep_min
-        # data[:, :, 5] = (data[:, :, 5] - dep_min) / dep_range
-
         return data
 
     def forward(self, x):

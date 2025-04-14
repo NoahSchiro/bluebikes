@@ -121,7 +121,10 @@ def main(args):
         shuffle=True,
         num_workers=os.cpu_count()
     )
-    
+
+    if not os.path.exists("./models"):
+        os.mkdir("./models")
+
     # Convert the station name to something appropriate for linux file paths
     station_name = args.station.replace(" ", "").lower()
     save_path = f"./models/{station_name}.pth"

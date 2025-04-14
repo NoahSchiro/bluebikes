@@ -32,8 +32,12 @@ class StationData(Dataset):
             self.station_name_fp = station_name
 
         self.db_path = sql_path
-        # This is not a good way of doing this... TODO
-        self.csv_path = "/".join(sql_path.split("/")[:-1]) + "/" + self.station_name_fp + ("_train.csv" if train else "_test.csv")
+        # CSV can go where the DB is but should be annotated with
+        # station name whether it is train or test
+        self.csv_path = os.path.join(
+            os.path.dirname(sql_path),
+            self.station_name_fp + ("_train.csv" if train else "_test.csv")
+        )
 
         self.time_window_hours = time_window_hours
         self.pred_horizon = pred_horizon
