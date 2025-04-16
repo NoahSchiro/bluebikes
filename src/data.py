@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from .stations import station_names
+from .stations import station_names, station_name_preprocess
 
 class StationData(Dataset):
     def __init__(
@@ -28,8 +28,7 @@ class StationData(Dataset):
             exit(0)
         else:
             self.station_name = station_name
-            station_name = station_name.replace(" ", "").lower()
-            self.station_name_fp = station_name
+            self.station_name_fp = station_name_preprocess(station_name)
 
         self.db_path = sql_path
         # CSV can go where the DB is but should be annotated with
@@ -73,7 +72,7 @@ class StationData(Dataset):
 
         print(f"Querying db at {sql_path}...")
 
-        df = pd.read_sql_query(f"""
+        df = pd.read_sql_query(rf"""
             WITH Departures AS (
                 SELECT
                     strftime('%Y-%m-%d %H:00:00', starttime) AS hour,
@@ -105,7 +104,7 @@ class StationData(Dataset):
                 Departures d
             JOIN
                 Arrivals a ON d.hour = a.hour AND d.station = a.station
-            WHERE d.station = '{self.station_name}'
+            WHERE d.station = '{self.station_name.replace("'", "''")}'
             ORDER BY
                 d.hour;
         """, db, dtype=self.dtype)
@@ -164,7 +163,10 @@ if __name__=="__main__":
 
     # Pathing assumes you are running this from bluebikes/src
     data = StationData(
-        station_name="Kenmore Square",
+        station_name="Packard's Corner - Commonwealth Ave at Brighton Ave",
         sql_path="../data/data.db",
         train=False
     )
+
+    x, y = data[0]
+    print(int(y[0][6].item()))

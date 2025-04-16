@@ -40,6 +40,18 @@ class BlueBikesModel(nn.Module):
         _, (hidden, _) = self.lstm(x)
         return self.linear(hidden[-1])  # Use last hidden state for prediction
 
+    def inference(self, data, stats):
+        data = self.preprocess(data, stats)
+
+        prediction = self.forward(data)
+
+        # Data comes back in shape [batch_size, 2]
+        # [[arrival, departures],
+        #  ...
+        #  [arrivals, departures]]
+        return prediction.tolist()
+
+
 if __name__=="__main__":
 
     model = BlueBikesModel(
@@ -48,7 +60,14 @@ if __name__=="__main__":
         num_layers=2
     )
 
-    data = torch.randn((2, 24, 6))
-    output = model.forward(data)
+    year_norm = {
+        "year": {
+            "min" : 2010,
+            "max" : 2025
+        },
+    }
+
+    data = torch.randn((2, 24, 7))
+    output = model.inference(data, year_norm)
 
     print(output)

@@ -12,7 +12,7 @@ import mlflow
 
 from src.model import BlueBikesModel
 from src.data import StationData
-from src.stations import station_names
+from src.stations import station_names, stations_of_consequence, station_name_preprocess
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
 
@@ -105,6 +105,10 @@ def main(args):
         time_window_hours=args.time_window,
     )
 
+    if len(train_ds) == 0 or len(test_ds) == 0:
+        print("Not enough training data, returning")
+        return
+
     year_norm = {
         "year": {
             "min" : 2010,
@@ -129,7 +133,7 @@ def main(args):
         os.mkdir("./models")
 
     # Convert the station name to something appropriate for linux file paths
-    station_name = args.station.replace(" ", "").lower()
+    station_name = station_name_preprocess(args.station)
     time = datetime.now().strftime("%Y-%m-%d:%H-%M")
     save_path = f"./models/{station_name}{time}.pth"
 
@@ -138,8 +142,9 @@ def main(args):
 
         print("Intial performance: ")
         best_eval_loss, best_arr_err, best_dep_err = evaluate(model, loss_fn, test_dl, year_norm, 0)
-        
-        for epoch in range(1, args.epochs+1):
+        best_epoch = 0
+        epoch = 0
+        while True:
             print(f"EPOCH: {epoch}")
             train(model, loss_fn, optim, train_dl, year_norm, epoch)
             el, ae, de = evaluate(model, loss_fn, test_dl, year_norm, epoch)
@@ -148,12 +153,30 @@ def main(args):
             if ae + de < best_arr_err + best_dep_err:
                 best_arr_err = ae
                 best_dep_err = de
+                best_epoch = epoch
                 print("Best model, saving...")
                 torch.save(model.state_dict(), save_path)
+
+            # Early stopping if we haven't reached a better model in 5 epochs
+            if epoch >= best_epoch + 5 or epoch >= args.max_epochs:
+                mlflow.log_param("epochs", best_epoch)
+                break
+
+            epoch += 1
 
         mlflow.log_metric("best_eval_loss", best_eval_loss)
         mlflow.log_metric("best_arrival_error", best_arr_err)
         mlflow.log_metric("best_departure_error", best_dep_err)
+
+# Logic for making a model for a list of stations
+# In this case, I am only making a model for stations with more than
+# 15k trips in 2024 (the test year). There is ~200 such stations.
+def run_many_stations(args):
+    for station in stations_of_consequence:
+        print(f"Training for station: {station}")
+        args.station = station
+        main(args)
+
 
 if __name__=="__main__":
 
@@ -172,10 +195,10 @@ if __name__=="__main__":
         help="RNG seed"
     )
     parser.add_argument(
-        "-e", "--epochs",
+        "-e", "--max_epochs",
         type=int,
-        default=20,
-        help="Number of epochs"
+        default=50,
+        help="Maximum number of epochs"
     )
     parser.add_argument(
         "-b", "--batch",
@@ -219,4 +242,5 @@ if __name__=="__main__":
 
     args = parser.parse_args()
 
-    main(args)
+    #main(args)
+    run_many_stations(args)
