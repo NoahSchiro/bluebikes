@@ -43,7 +43,7 @@ class BlueBikesModel(nn.Module):
     def inference(self, data, stats):
         data = self.preprocess(data, stats)
 
-        prediction = self.forward(data)
+        prediction = self.forward(data).round().relu()
 
         # Data comes back in shape [batch_size, 2]
         # [[arrival, departures],

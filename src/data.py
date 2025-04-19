@@ -134,7 +134,7 @@ class StationData(Dataset):
         self._load_csv(csv_path)
 
     def __len__(self):
-        return len(self.unique_hours) - self.time_window_hours - self.pred_horizon
+        return max(len(self.unique_hours) - self.time_window_hours - self.pred_horizon, 0)
 
     def __getitem__(self, idx):
 

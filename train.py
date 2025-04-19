@@ -1,6 +1,7 @@
 import argparse
 import os
 from datetime import datetime
+from glob import glob
 
 import torch
 from torch import nn
@@ -173,9 +174,14 @@ def main(args):
 # 15k trips in 2024 (the test year). There is ~200 such stations.
 def run_many_stations(args):
     for station in stations_of_consequence:
-        print(f"Training for station: {station}")
-        args.station = station
-        main(args)
+
+        # If I have already trained a station, skip it
+        if glob(f"./models/{station_name_preprocess(station)}*.pth"):
+            print(f"Skipping {station}")
+        else:
+            print(f"Training for station: {station}")
+            args.station = station
+            main(args)
 
 
 if __name__=="__main__":
