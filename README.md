@@ -1,5 +1,4 @@
 # Bluebikes
-
 The City of Boston has [BlueBikes](https://bluebikes.com/). Similar to NYC's CitiBikes. The City also provides [data](https://bluebikes.com/system-data) of _every trip ever going back to 2011_! What kind of interesting stuff can we do with that?
 
 ## Get started
@@ -37,6 +36,32 @@ I trained a model for roughly 212 stations. Here is a breakdown of how many mode
 | `1.0 > e` | 70 | 70 |
 
 For models exceeding 2.0, we tend to have a very large dataset. I believe that increasing the model size (either hidden size or number of layers in the LSTM) would improve this model, but I would also have to change the way that I am saving / loading the model such that I can have variable model architectures. This is an area for future exploration.
+
+### Models
+
+I have trained for the most popular stations (anything > 15k arrivals / departures in 2024). If you would like to use these for your own applications, they can be found [here](https://drive.google.com/drive/folders/1xTUIVHAwcvt1qPb1tTZTNizWnu7aTDcw?usp=sharing).
+
+The models must have the following architecture:
+
+```
+# BlueBikesModel is defined in src/model.py
+model = BlueBikesModel(
+    input_size=7,
+    hidden_size=16,
+    num_layers=4
+)
+```
+
+Input is a tensor of shape: `[batch, sequence_length, features]`. The features are `[year, month, day, day of week, hour, arrivals, departures]`. I have trained on a sequence length of 24. The model will output the prediction for the subsequent hour with shape: `[arrivals, departures]` (batched). Some of the date normalization happens automatically, but years are normalized within a defined range which is the range you would like the model to be operational. For these, I have used the minimum year to be 2015 and the maximum year to be 2025. Somewhere you will need the following defined as the model will use it in preprocessing:
+
+```
+year_norm = {
+    "year" : {
+        "max" : 2025,
+        "min" : 2015
+    }
+}
+```
 
 ## Dynamic Pricing
 
